@@ -1,5 +1,11 @@
 # Short URL
 
+<p align="center">
+  <img src="./docs/dashboard.png" alt="Analytics Dashboard" width="800">
+</p>
+
+> **📸 Screenshot placeholder** — See [docs/CAPTURE_INSTRUCTIONS.md](./docs/CAPTURE_INSTRUCTIONS.md) for capture instructions
+
 A modern URL shortener with click analytics, QR code generation, and a real-time dashboard — built with Next.js 16, Prisma 7, and Neon PostgreSQL.
 
 ## Features
