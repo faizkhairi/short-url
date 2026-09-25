@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { isSafeDestination } from '@/lib/utils';
 import { UAParser } from 'ua-parser-js';
 
 export async function GET(
@@ -11,7 +12,10 @@ export async function GET(
   try {
     const url = await prisma.url.findUnique({ where: { code } });
 
-    if (!url || !url.active) {
+    // Re-validate at redirect time, not just at creation: a stored
+    // destination could predate this check, and re-validating closes
+    // that gap instead of trusting a write-time decision forever.
+    if (!url || !url.active || !isSafeDestination(url.original)) {
       return NextResponse.redirect(new URL('/?error=not-found', request.url));
     }
 

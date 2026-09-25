@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { createShortCode, isValidUrl, isValidCode } from '@/lib/utils';
+import { createShortCode, isSafeDestination, isValidCode } from '@/lib/utils';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const rateLimit = checkRateLimit(`shorten:${getClientIp(request)}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many links created. Please try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    );
+  }
+
   try {
     const body = await request.json();
     const { url, customCode } = body as { url: string; customCode?: string };
 
-    if (!url || !isValidUrl(url)) {
+    if (!url || !isSafeDestination(url)) {
       return NextResponse.json(
-        { error: 'Please provide a valid URL (http or https)' },
+        { error: 'Please provide a valid, publicly reachable URL (http or https)' },
         { status: 400 }
       );
     }

@@ -13,6 +13,8 @@ A modern URL shortener with click analytics, QR code generation, and a real-time
 - **Click Analytics** — Track clicks with timestamp, geo-location, device, browser, OS, and referrer
 - **Analytics Dashboard** — Visualize clicks over time, device breakdown, top referrers, and geographic distribution
 - **Link Management** — Toggle links active/inactive, delete with cascade
+- **SSRF-safe redirects**: destination URLs are checked against localhost/internal hostnames and private/loopback/link-local IP ranges (including decimal, octal, hex, and IPv6-mapped encodings) both when a link is created and again on every redirect
+- **Rate limiting**: link creation is capped per IP via an in-memory sliding-window limiter (best-effort, per serverless instance)
 
 ## Tech Stack
 
@@ -94,10 +96,28 @@ short-url/
 │   └── GeoChart.tsx              # Country breakdown
 ├── lib/
 │   ├── db.ts                     # Prisma client (Neon adapter)
-│   ├── utils.ts                  # URL validation, nanoid
+│   ├── utils.ts                  # URL validation, SSRF-safe destination check, nanoid
+│   ├── rate-limit.ts             # In-memory per-IP sliding-window limiter
 │   └── analytics.ts              # Click aggregation queries
 └── prisma/schema.prisma          # Database schema
 ```
+
+## Security Notes
+
+- `isSafeDestination()` in `lib/utils.ts` is the single source of truth for
+  "is this URL safe to redirect to". It is enforced both in
+  `POST /api/shorten` (creation) and in `GET /[code]` (every redirect), so a
+  destination that was safe when stored but shouldn't be trusted anymore
+  (or a row written by another path) is still blocked at redirect time.
+  It rejects non-http(s) protocols, embedded credentials, `localhost`/
+  `*.localhost`/`*.local`/`*.internal` hostnames, and IPv4/IPv6 literals in
+  loopback, private, link-local, and CGNAT ranges, including decimal, octal,
+  hex, and IPv4-mapped IPv6 encodings of those addresses.
+- `checkRateLimit()` in `lib/rate-limit.ts` throttles `POST /api/shorten` to
+  10 requests/minute per IP (from the first hop of `x-forwarded-for`). It is
+  **best-effort**: state lives in the Node process's memory, so on Vercel it
+  is scoped to a single warm serverless instance, not shared globally across
+  instances, regions, or deployments.
 
 ## Scripts
 
